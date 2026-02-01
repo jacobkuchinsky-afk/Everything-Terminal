@@ -36,18 +36,37 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const url = searchParams.get('url')
   
+  // #region agent log
+  console.log('[DEBUG-H1] video-info called with url:', url);
+  fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:38',message:'API called',data:{url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
+  
   try {
     if (!url) {
       return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 })
     }
     
     const videoId = extractVideoId(url)
+    
+    // #region agent log
+    console.log('[DEBUG-H2] Extracted videoId:', videoId, 'from url:', url);
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:50',message:'Video ID extraction',data:{videoId,url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    
     if (!videoId) {
+      // #region agent log
+      console.log('[DEBUG-H2] FAILED: videoId is null');
+      // #endregion
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
     
     // Use YouTube oEmbed API for basic info (doesn't get blocked)
     const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+    
+    // #region agent log
+    console.log('[DEBUG-H3] Fetching oEmbed URL:', oembedUrl);
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:65',message:'Before oEmbed fetch',data:{oembedUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     
     const response = await fetch(oembedUrl, {
       headers: {
@@ -55,14 +74,42 @@ export async function GET(request: NextRequest) {
       }
     })
     
+    // #region agent log
+    console.log('[DEBUG-H1-H3] oEmbed response status:', response.status, 'ok:', response.ok);
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:76',message:'oEmbed response received',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H3'})}).catch(()=>{});
+    // #endregion
+    
     if (!response.ok) {
+      // #region agent log
+      const errorText = await response.text();
+      console.log('[DEBUG-H1] oEmbed BLOCKED/FAILED. Status:', response.status, 'Body:', errorText);
+      // #endregion
       return NextResponse.json(
         { error: 'Video not found or unavailable' },
         { status: 404 }
       )
     }
     
-    const data = await response.json()
+    const responseText = await response.text()
+    
+    // #region agent log
+    console.log('[DEBUG-H4] oEmbed response text length:', responseText.length, 'preview:', responseText.substring(0, 200));
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:93',message:'oEmbed response text',data:{length:responseText.length,preview:responseText.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      // #region agent log
+      console.log('[DEBUG-H4] JSON parse FAILED:', parseError);
+      // #endregion
+      return NextResponse.json({ error: 'Failed to parse video data' }, { status: 500 })
+    }
+    
+    // #region agent log
+    console.log('[DEBUG-H4] Parsed data:', JSON.stringify(data).substring(0, 300));
+    // #endregion
     
     return NextResponse.json({
       success: true,
@@ -70,7 +117,7 @@ export async function GET(request: NextRequest) {
         id: videoId,
         title: data.title || 'Unknown Title',
         author: data.author_name || 'Unknown',
-        duration: 'N/A', // oEmbed doesn't provide duration
+        duration: 'N/A',
         durationSeconds: 0,
         thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
         views: 0,
@@ -80,7 +127,12 @@ export async function GET(request: NextRequest) {
     
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[video-info] Error:', errorMessage)
+    const errorStack = error instanceof Error ? error.stack : ''
+    
+    // #region agent log
+    console.log('[DEBUG-H5] UNCAUGHT ERROR:', errorMessage, 'Stack:', errorStack);
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'video-info/route.ts:130',message:'Uncaught error',data:{errorMessage,errorStack},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
     
     return NextResponse.json(
       { error: `Failed to fetch video information: ${errorMessage}` },
