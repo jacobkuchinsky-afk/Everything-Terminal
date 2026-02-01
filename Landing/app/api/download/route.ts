@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import ytdl from '@distube/ytdl-core'
 
-// Force redeploy - v6 - fallback to redirect service
+// Force redeploy - v7 - back to ytdl-core
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// Extract video ID from YouTube URL
-function extractVideoId(url: string): string | null {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
-    /^([a-zA-Z0-9_-]{11})$/
-  ]
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern)
-    if (match) return match[1]
-  }
-  return null
+// #region agent log
+console.log('[DEBUG] download module loaded - v7 (ytdl-core)');
+// #endregion
+
+// Sanitize filename
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/[<>:"/\\|?*]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 100)
 }
 
 export async function GET(request: NextRequest) {
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get('format') || 'mp4'
   
   // #region agent log
-  console.log('[DEBUG-DL] download API called - v6, url:', url, 'format:', format);
+  console.log('[DEBUG-DL] download called - v7, url:', url, 'format:', format);
   // #endregion
   
   try {
@@ -33,96 +32,145 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 })
     }
     
-    const videoId = extractVideoId(url)
-    if (!videoId) {
+    // Validate YouTube URL
+    if (!ytdl.validateURL(url)) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
     
+    // #region agent log
+    console.log('[DEBUG-DL] Getting video info');
+    // #endregion
+    
+    // Get video info with custom request options
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Cache-Control': 'max-age=0'
+        }
+      }
+    })
+    
+    const title = sanitizeFilename(info.videoDetails.title)
     const isAudio = format === 'mp3' || format === 'm4a'
     
-    // Use y2mate-style services that work via redirect
-    // These services accept a YouTube URL and return a download page
-    const downloadServices = [
-      // ssyoutube - prepend "ss" before youtube in URL
-      `https://www.ssyoutube.com/watch?v=${videoId}`,
-      // y2mate
-      `https://www.y2mate.com/youtube/${videoId}`,
-      // savefrom
-      `https://en.savefrom.net/1-youtube-video-downloader-2/?url=https://www.youtube.com/watch?v=${videoId}`
-    ]
+    // #region agent log
+    console.log('[DEBUG-DL] Choosing format, isAudio:', isAudio);
+    // #endregion
     
-    // Try cobalt instances with new API format first
-    const cobaltInstances = [
-      'https://cobalt-backend.canine.tools',
-      'https://cobalt.tskau.team',
-      'https://dl.khyernet.xyz'
-    ]
+    // Select the appropriate format
+    let selectedFormat
     
-    for (const instance of cobaltInstances) {
-      try {
-        // #region agent log
-        console.log('[DEBUG-DL] Trying cobalt instance:', instance);
-        // #endregion
-        
-        const response = await fetch(instance, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: `https://www.youtube.com/watch?v=${videoId}`,
-            downloadMode: isAudio ? 'audio' : 'auto',
-            audioFormat: 'mp3',
-            videoQuality: '720'
-          })
+    if (isAudio) {
+      selectedFormat = ytdl.chooseFormat(info.formats, {
+        quality: 'highestaudio',
+        filter: 'audioonly'
+      })
+    } else {
+      // Try to get mp4 with video+audio
+      selectedFormat = ytdl.chooseFormat(info.formats, {
+        quality: 'highest',
+        filter: (f) => f.container === 'mp4' && f.hasVideo && f.hasAudio
+      })
+      
+      // Fallback to any format with video+audio
+      if (!selectedFormat) {
+        selectedFormat = ytdl.chooseFormat(info.formats, {
+          quality: 'highest',
+          filter: 'videoandaudio'
         })
-        
-        // #region agent log
-        console.log('[DEBUG-DL] Response status:', response.status);
-        // #endregion
-        
-        if (response.ok) {
-          const data = await response.json()
-          
-          // #region agent log
-          console.log('[DEBUG-DL] Response data:', JSON.stringify(data).substring(0, 300));
-          // #endregion
-          
-          if (data.url) {
-            return NextResponse.redirect(data.url)
-          }
-          if (data.status === 'redirect' && data.url) {
-            return NextResponse.redirect(data.url)
-          }
-          if (data.status === 'tunnel' && data.url) {
-            return NextResponse.redirect(data.url)
-          }
-          if (data.status === 'picker' && data.picker?.[0]?.url) {
-            return NextResponse.redirect(data.picker[0].url)
-          }
-        }
-      } catch (e) {
-        // #region agent log
-        console.log('[DEBUG-DL] Instance error:', instance, e instanceof Error ? e.message : e);
-        // #endregion
       }
     }
     
+    if (!selectedFormat || !selectedFormat.url) {
+      // #region agent log
+      console.log('[DEBUG-DL] No suitable format found');
+      // #endregion
+      return NextResponse.json(
+        { error: 'No suitable format found for this video' },
+        { status: 404 }
+      )
+    }
+    
     // #region agent log
-    console.log('[DEBUG-DL] All cobalt instances failed, redirecting to download service');
+    console.log('[DEBUG-DL] Selected format:', selectedFormat.qualityLabel || selectedFormat.audioBitrate);
     // #endregion
     
-    // Fallback: redirect to a web-based download service
-    // User will need to click download on that page
-    return NextResponse.redirect(downloadServices[0])
+    // Determine content type and extension
+    let contentType: string
+    let extension: string
+    
+    switch (format) {
+      case 'mp3':
+        contentType = 'audio/mpeg'
+        extension = 'mp3'
+        break
+      case 'm4a':
+        contentType = 'audio/mp4'
+        extension = 'm4a'
+        break
+      case 'webm':
+        contentType = 'video/webm'
+        extension = 'webm'
+        break
+      case 'mp4':
+      default:
+        contentType = selectedFormat.mimeType?.split(';')[0] || 'video/mp4'
+        extension = 'mp4'
+    }
+    
+    const filename = `${title}.${extension}`
+    
+    // #region agent log
+    console.log('[DEBUG-DL] Fetching stream from URL');
+    // #endregion
+    
+    // Fetch the video/audio stream from YouTube
+    const response = await fetch(selectedFormat.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Range': 'bytes=0-'
+      }
+    })
+    
+    if (!response.ok || !response.body) {
+      // #region agent log
+      console.log('[DEBUG-DL] Stream fetch failed:', response.status);
+      // #endregion
+      return NextResponse.json(
+        { error: 'Failed to fetch video stream' },
+        { status: 500 }
+      )
+    }
+    
+    // #region agent log
+    console.log('[DEBUG-DL] Returning stream response');
+    // #endregion
+    
+    // Return the stream response
+    return new NextResponse(response.body, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': selectedFormat.contentLength || response.headers.get('Content-Length') || '',
+        'Cache-Control': 'no-cache',
+        'Accept-Ranges': 'bytes'
+      }
+    })
     
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[DEBUG-DL] Error:', errorMessage)
     
     return NextResponse.json(
-      { error: `Download failed: ${errorMessage}` },
+      { error: `Failed to download: ${errorMessage}` },
       { status: 500 }
     )
   }
