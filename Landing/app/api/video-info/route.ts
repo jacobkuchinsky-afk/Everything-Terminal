@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         durationSeconds: parseInt(videoDetails.lengthSeconds),
         thumbnail: thumbnail,
         views: parseInt(videoDetails.viewCount) || 0,
-        description: videoDetails.shortDescription || ''
+        description: videoDetails.description || ''
       }
     })
     
