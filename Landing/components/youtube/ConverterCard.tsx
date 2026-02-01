@@ -125,12 +125,14 @@ export default function ConverterCard() {
         throw new Error(data.detail || 'Download failed')
       }
 
-      if (data.download_url) {
-        setDownloadUrl(data.download_url)
+      if (data.success) {
+        // Use the stream endpoint which forces download with proper headers
+        const streamUrl = `${backendUrl}/api/stream?url=${encodeURIComponent(fullYouTubeUrl)}&format=${format}`
+        setDownloadUrl(streamUrl)
         setStatus('ready')
         
-        // Open download URL in new tab
-        window.open(data.download_url, '_blank')
+        // Open stream URL - this will trigger automatic download
+        window.location.href = streamUrl
       } else {
         throw new Error('No download URL available')
       }

@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pytubefix import YouTube
 from pytubefix.exceptions import VideoUnavailable, RegexMatchError
 import os
+import urllib.parse
 
 app = FastAPI(title="YouTube Downloader API")
 
@@ -84,6 +86,62 @@ def get_download_url(url: str, format: str = "mp4"):
                 detail="YouTube is temporarily blocking requests. Please try again later."
             )
         raise HTTPException(status_code=500, detail=f"Error: {error_msg}")
+
+@app.get("/api/stream")
+def stream_video(url: str, format: str = "mp4"):
+    """
+    Stream the video directly with download headers.
+    This forces the browser to download instead of play.
+    """
+    if not url:
+        raise HTTPException(status_code=400, detail="Missing url parameter")
+    
+    try:
+        yt = YouTube(url)
+        title = yt.title
+        
+        # Get stream based on format
+        if format == 'mp3':
+            stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+            if not stream:
+                stream = yt.streams.filter(only_audio=True).first()
+            ext = 'mp3'
+        else:
+            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+            if not stream:
+                stream = yt.streams.filter(progressive=True).first()
+            ext = 'mp4'
+        
+        if not stream:
+            raise HTTPException(status_code=500, detail="No suitable stream found")
+        
+        # Clean filename
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+        filename = f"{safe_title}.{ext}"
+        
+        # Stream the content
+        def iterfile():
+            with stream.stream_to_buffer() as buffer:
+                while True:
+                    chunk = buffer.read(1024 * 1024)  # 1MB chunks
+                    if not chunk:
+                        break
+                    yield chunk
+        
+        # Return as streaming response with download headers
+        return StreamingResponse(
+            iterfile(),
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{urllib.parse.quote(filename)}"'
+            }
+        )
+            
+    except VideoUnavailable:
+        raise HTTPException(status_code=404, detail="Video is unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
 
 @app.get("/api/info")
 def get_video_info(url: str):
