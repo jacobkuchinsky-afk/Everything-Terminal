@@ -106,24 +106,23 @@ export default function ConverterCard() {
     const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
     // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Starting download redirect',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-url-format'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Starting download redirect',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-working-services'})}).catch(()=>{});
     // #endregion
     
-    // Build download URL based on format
-    // Using ssyoutube.com (prepend 'ss' to youtube.com URL path)
-    // This service works by transforming youtube.com URLs
+    // Build download URL - using 10downloader.com which is currently operational
+    // Format: https://10downloader.com/download?v=VIDEO_URL
     let downloadUrl: string
     
     if (format === 'mp3') {
-      // For MP3: use yt1s which has good audio conversion
-      downloadUrl = `https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURIComponent(fullYouTubeUrl)}`
+      // For MP3: use y2mate.is (different from y2mate.com)
+      downloadUrl = `https://www.y2mate.is/v72/youtube-mp3/${videoId}`
     } else {
-      // For MP4: use ssyoutube (prepend 'ss' to youtube.com)
-      downloadUrl = `https://www.ssyoutube.com/watch?v=${videoId}`
+      // For MP4: use 10downloader.com 
+      downloadUrl = `https://10downloader.com/download?v=${encodeURIComponent(fullYouTubeUrl)}`
     }
     
     // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Opening download URL',data:{downloadUrl,format},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-url-format'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Opening download URL',data:{downloadUrl,format},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-working-services'})}).catch(()=>{});
     // #endregion
     
     // Open in new tab
