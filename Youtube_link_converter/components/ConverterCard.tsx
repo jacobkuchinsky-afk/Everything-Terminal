@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import LinkInput from './LinkInput'
 import FormatSelector from './FormatSelector'
 import ConvertButton from './ConvertButton'
@@ -20,6 +20,7 @@ export default function ConverterCard() {
   const isValidUrl = url.includes('youtube.com') || url.includes('youtu.be')
 
   // Fetch video info when URL changes (debounced)
+  // Now fetches oEmbed directly from client to avoid YouTube blocking server IPs
   const fetchVideoInfo = useCallback(async (videoUrl: string) => {
     if (!videoUrl || !isValidUrl) {
       setVideoInfo(null)
@@ -32,16 +33,55 @@ export default function ConverterCard() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/video-info?url=${encodeURIComponent(videoUrl)}`)
-      const data = await response.json()
+      // #region agent log
+      console.log('[DEBUG-CLIENT] Fetching video info for:', videoUrl);
+      // #endregion
+      
+      // Step 1: Get video ID from our API (just extracts ID, no YouTube request)
+      const apiResponse = await fetch(`/api/video-info?url=${encodeURIComponent(videoUrl)}`)
+      const apiData = await apiResponse.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch video info')
+      if (!apiResponse.ok) {
+        throw new Error(apiData.error || 'Invalid YouTube URL')
       }
 
-      setVideoInfo(data.video)
+      // #region agent log
+      console.log('[DEBUG-CLIENT] Got videoId:', apiData.videoId);
+      // #endregion
+
+      // Step 2: Fetch oEmbed directly from client (browser IP won't be blocked)
+      const oembedResponse = await fetch(apiData.oembedUrl)
+      
+      // #region agent log
+      console.log('[DEBUG-CLIENT] oEmbed response status:', oembedResponse.status);
+      // #endregion
+      
+      if (!oembedResponse.ok) {
+        throw new Error('Video not found or unavailable')
+      }
+
+      const oembedData = await oembedResponse.json()
+      
+      // #region agent log
+      console.log('[DEBUG-CLIENT] oEmbed data received, title:', oembedData.title);
+      // #endregion
+
+      // Combine the data
+      setVideoInfo({
+        id: apiData.videoId,
+        title: oembedData.title || 'Unknown Title',
+        author: oembedData.author_name || 'Unknown',
+        duration: 'N/A',
+        durationSeconds: 0,
+        thumbnail: apiData.thumbnail,
+        views: 0,
+        description: ''
+      })
       setStatus('ready')
     } catch (err) {
+      // #region agent log
+      console.log('[DEBUG-CLIENT] Error:', err);
+      // #endregion
       setError(err instanceof Error ? err.message : 'Failed to fetch video info')
       setVideoInfo(null)
       setStatus('error')
@@ -71,11 +111,10 @@ export default function ConverterCard() {
     setError(null)
 
     try {
-      // Create download URL
+      // Create download URL - Cobalt API handles the actual download
       const downloadUrl = `/api/download?url=${encodeURIComponent(url)}&format=${format}`
       
       // Open in new tab to trigger download
-      // Using window.open for better handling of large files
       const link = document.createElement('a')
       link.href = downloadUrl
       link.download = `${videoInfo.title}.${format}`
