@@ -1,8 +1,20 @@
+import type { Metadata } from "next";
 import Link from 'next/link'
 import Header from '@/components/youtube/Header'
 import AdBanner from '@/components/youtube/AdBanner'
 import AdSidebar from '@/components/youtube/AdSidebar'
 import ConverterCard from '@/components/youtube/ConverterCard'
+
+export const metadata: Metadata = {
+  title: "YouTube Converter",
+  description: "Free YouTube video converter. Download YouTube videos as MP4 or extract audio as MP3. Multiple quality options available. Fast and easy to use.",
+  keywords: ["youtube converter", "youtube to mp3", "youtube to mp4", "video downloader", "audio extractor", "youtube download", "video converter", "free youtube downloader"],
+  openGraph: {
+    title: "YouTube Converter | Everything Terminal",
+    description: "Free YouTube video converter. Download videos as MP4 or extract audio as MP3 with multiple quality options.",
+    type: "website",
+  },
+};
 
 export default function YouTubePage() {
   return (

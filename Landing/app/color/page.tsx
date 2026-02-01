@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from 'next/link'
 import { ColorPicker } from '@/components/color/ColorPicker';
 import AdPlaceholder from '@/components/AdPlaceholder';
+
+export const metadata: Metadata = {
+  title: "Color Picker",
+  description: "Free online color picker with 8 output formats: HEX, RGB, RGBA, HSL, HSLA, HSV, CMYK, and CSS. One-click copy, color history, and intuitive visual interface for designers and developers.",
+  keywords: ["color picker", "hex color picker", "rgb color picker", "hsl color", "color converter", "css colors", "web colors", "color palette", "color tool", "design tool"],
+  openGraph: {
+    title: "Color Picker | Everything Terminal",
+    description: "Free online color picker with 8 output formats: HEX, RGB, HSL, CMYK and more. One-click copy and color history.",
+    type: "website",
+  },
+};
 
 export default function ColorPage() {
   return (

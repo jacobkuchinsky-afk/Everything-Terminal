@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import Link from 'next/link';
 import { GraphingCalculator } from '@/components/graph/GraphingCalculator';
+
+export const metadata: Metadata = {
+  title: "Graphing Calculator",
+  description: "Free online graphing calculator for plotting mathematical functions. Supports multiple equations, variable sliders, intersection points, and zoom controls. Perfect for students and educators.",
+  keywords: ["graphing calculator", "online graphing", "function plotter", "math graphing", "equation grapher", "interactive graph", "plot functions", "mathematics tool", "algebra graphing"],
+  openGraph: {
+    title: "Graphing Calculator | Everything Terminal",
+    description: "Free online graphing calculator for plotting mathematical functions. Supports multiple equations, variable sliders, and interactive controls.",
+    type: "website",
+  },
+};
 
 export default function GraphPage() {
   return (

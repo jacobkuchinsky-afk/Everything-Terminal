@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pytube import YouTube
-from pytube.exceptions import VideoUnavailable, RegexMatchError
+from pytubefix import YouTube
+from pytubefix.exceptions import VideoUnavailable, RegexMatchError
 import os
 
 app = FastAPI(title="YouTube Downloader API")
