@@ -93,6 +93,9 @@ def stream_video(url: str, format: str = "mp4"):
     Stream the video directly with download headers.
     This forces the browser to download instead of play.
     """
+    import requests
+    from io import BytesIO
+    
     if not url:
         raise HTTPException(status_code=400, detail="Missing url parameter")
     
@@ -106,11 +109,13 @@ def stream_video(url: str, format: str = "mp4"):
             if not stream:
                 stream = yt.streams.filter(only_audio=True).first()
             ext = 'mp3'
+            mime = 'audio/mpeg'
         else:
             stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
             if not stream:
                 stream = yt.streams.filter(progressive=True).first()
             ext = 'mp4'
+            mime = 'video/mp4'
         
         if not stream:
             raise HTTPException(status_code=500, detail="No suitable stream found")
@@ -119,19 +124,23 @@ def stream_video(url: str, format: str = "mp4"):
         safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
         filename = f"{safe_title}.{ext}"
         
-        # Stream the content
+        # Get the direct video URL and stream it through our server
+        video_url = stream.url
+        
         def iterfile():
-            with stream.stream_to_buffer() as buffer:
-                while True:
-                    chunk = buffer.read(1024 * 1024)  # 1MB chunks
-                    if not chunk:
-                        break
-                    yield chunk
+            # Stream from YouTube URL with proper headers
+            with requests.get(video_url, stream=True, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        yield chunk
         
         # Return as streaming response with download headers
         return StreamingResponse(
             iterfile(),
-            media_type="application/octet-stream",
+            media_type=mime,
             headers={
                 "Content-Disposition": f'attachment; filename="{urllib.parse.quote(filename)}"'
             }
