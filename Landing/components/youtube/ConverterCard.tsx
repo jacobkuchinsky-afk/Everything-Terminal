@@ -1,13 +1,27 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, ExternalLink } from 'lucide-react'
 import LinkInput from '@/components/youtube/LinkInput'
 import FormatSelector from '@/components/youtube/FormatSelector'
 import ConvertButton from '@/components/youtube/ConvertButton'
 import VideoPreview, { VideoInfo } from '@/components/youtube/VideoPreview'
 
 type Status = 'idle' | 'fetching' | 'ready' | 'downloading' | 'error'
+
+// Extract video ID from YouTube URL (client-side)
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+  return null
+}
 
 export default function ConverterCard() {
   const [url, setUrl] = useState('')
@@ -19,7 +33,7 @@ export default function ConverterCard() {
   // Check if URL looks like a valid YouTube URL
   const isValidUrl = url.includes('youtube.com') || url.includes('youtu.be')
 
-  // Fetch video info when URL changes (debounced)
+  // Fetch video info entirely from client-side (user's browser IP won't be blocked)
   const fetchVideoInfo = useCallback(async (videoUrl: string) => {
     if (!videoUrl || !isValidUrl) {
       setVideoInfo(null)
@@ -32,15 +46,32 @@ export default function ConverterCard() {
     setError(null)
 
     try {
-      // Fetch from our API (using ytdl-core on server)
-      const response = await fetch(`/api/video-info?url=${encodeURIComponent(videoUrl)}`)
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch video info')
+      const videoId = extractVideoId(videoUrl)
+      
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL')
       }
 
-      setVideoInfo(data.video)
+      // Fetch oEmbed data directly from client (user's IP, not blocked)
+      const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      const response = await fetch(oembedUrl)
+      
+      if (!response.ok) {
+        throw new Error('Video not found or unavailable')
+      }
+
+      const data = await response.json()
+
+      setVideoInfo({
+        id: videoId,
+        title: data.title || 'Unknown Title',
+        author: data.author_name || 'Unknown',
+        duration: 'N/A',
+        durationSeconds: 0,
+        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        views: 0,
+        description: ''
+      })
       setStatus('ready')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch video info')
@@ -64,33 +95,26 @@ export default function ConverterCard() {
     return () => clearTimeout(timer)
   }, [url, isValidUrl, fetchVideoInfo])
 
-  // Handle download
+  // Handle download - redirect to external download service
   const handleConvert = async () => {
     if (!videoInfo || !url) return
 
     setStatus('downloading')
     setError(null)
 
-    try {
-      // Create download URL
-      const downloadUrl = `/api/download?url=${encodeURIComponent(url)}&format=${format}`
-      
-      // Open in new tab to trigger download
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = `${videoInfo.title}.${format}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      // Show success briefly then reset to ready
-      setTimeout(() => {
-        setStatus('ready')
-      }, 2000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Download failed')
-      setStatus('error')
-    }
+    const videoId = videoInfo.id
+    
+    // Use y2mate which is still operational
+    // It will open in a new tab where user can download
+    const downloadUrl = `https://www.y2mate.com/youtube/${videoId}`
+    
+    // Open in new tab
+    window.open(downloadUrl, '_blank')
+    
+    // Reset status after a moment
+    setTimeout(() => {
+      setStatus('ready')
+    }, 1000)
   }
 
   // Handle URL change
@@ -151,11 +175,11 @@ export default function ConverterCard() {
         />
       </div>
 
-      {/* Download status */}
-      {status === 'downloading' && (
-        <div className="flex items-center justify-center gap-2 text-yt-red mt-4">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span>Starting download...</span>
+      {/* Download note */}
+      {videoInfo && (
+        <div className="flex items-center justify-center gap-2 text-yt-text-muted text-sm mt-4">
+          <ExternalLink className="w-4 h-4" />
+          <span>Opens download page in new tab</span>
         </div>
       )}
 
