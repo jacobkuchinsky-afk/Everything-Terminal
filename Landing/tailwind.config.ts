@@ -31,8 +31,8 @@ const config: Config = {
           border: "#262626",
           borderHover: "#404040",
           text: "#f0f0f0",
-          textMuted: "#737373",
-          textDim: "#a3a3a3",
+          textMuted: "#8a8a8a",
+          textDim: "#b3b3b3",
           accent: "#14B8A6",
         },
         // Cipher colors
@@ -47,7 +47,7 @@ const config: Config = {
           borderHover: "#2a3347",
           glow: "#0088FF",
           text: "#e4e6eb",
-          textMuted: "#8b8f9a",
+          textMuted: "#9fa3ae",
         },
         // Color Picker colors
         picker: {
@@ -58,7 +58,7 @@ const config: Config = {
           primary: "#F59E0B",
           bright: "#FBBF24",
           border: "#292524",
-          muted: "#78716C",
+          muted: "#9c9590",
         },
         // YouTube colors
         yt: {
@@ -69,6 +69,25 @@ const config: Config = {
           text: "#f5f5f5",
           textMuted: "#a3a3a3",
           border: "#262626",
+        },
+        // Graphing Calculator colors
+        graph: {
+          bg: "#0d0d0d",
+          sidebar: "#111111",
+          input: "#1a1a1a",
+          inputHover: "#222222",
+          border: "#2a2a2a",
+          primary: "#4285f4",
+          blue: "#2d70b3",
+          red: "#c74440",
+          green: "#388c46",
+          purple: "#6042a6",
+          orange: "#fa7e19",
+          text: "#f0f0f0",
+          muted: "#a0a0a0",
+          canvas: "#0d0d0d",
+          grid: "#2a2a2a",
+          axes: "#4a4a4a",
         },
       },
     },

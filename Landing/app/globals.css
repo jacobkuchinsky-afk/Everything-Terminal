@@ -25,7 +25,7 @@
   --calc-border: #262626;
   --calc-border-hover: #404040;
   --calc-text: #f0f0f0;
-  --calc-text-muted: #737373;
+  --calc-text-muted: #8a8a8a;
   
   /* Cipher Variables */
   --cipher-black: #000000;
@@ -38,7 +38,7 @@
   --cipher-border-hover: #2a3347;
   --cipher-glow: #0088FF;
   --cipher-text: #e4e6eb;
-  --cipher-text-muted: #8b8f9a;
+  --cipher-text-muted: #9fa3ae;
   
   /* Color Picker Variables */
   --picker-black: #000000;
@@ -48,7 +48,7 @@
   --picker-primary: #F59E0B;
   --picker-bright: #FBBF24;
   --picker-border: #292524;
-  --picker-muted: #78716C;
+  --picker-muted: #9c9590;
   
   /* YouTube Variables */
   --yt-bg: #0a0a0a;
@@ -58,6 +58,19 @@
   --yt-text: #f5f5f5;
   --yt-text-muted: #a3a3a3;
   --yt-border: #262626;
+  
+  /* Graph Variables */
+  --graph-bg: #0d0d0d;
+  --graph-sidebar: #111111;
+  --graph-input: #1a1a1a;
+  --graph-input-hover: #222222;
+  --graph-border: #2a2a2a;
+  --graph-primary: #4285f4;
+  --graph-text: #f0f0f0;
+  --graph-muted: #a0a0a0;
+  --graph-canvas: #0d0d0d;
+  --graph-grid: #2a2a2a;
+  --graph-axes: #4a4a4a;
 }
 
 * {
@@ -453,12 +466,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .ad-placeholder {
-  border: 2px dashed #2a2a2a;
+  border: 2px dashed #3a3a3a;
   background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4a4a4a;
+  color: #888888;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;

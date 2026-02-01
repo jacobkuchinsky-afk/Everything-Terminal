@@ -32,8 +32,8 @@ export default function AdSidebar({ side }: AdSidebarProps) {
         {/* Placeholder shown when ad isn't loaded */}
         {!adLoaded && (
           <div className="ad-placeholder w-full h-full rounded-lg flex flex-col items-center justify-center gap-2">
-            <span className="text-yt-text-muted text-xs uppercase tracking-widest">Ad</span>
-            <span className="text-yt-text-muted text-xs uppercase tracking-widest">Space</span>
+            <span className="text-neutral-400 text-xs uppercase tracking-widest">Ad</span>
+            <span className="text-neutral-400 text-xs uppercase tracking-widest">Space</span>
           </div>
         )}
         <ins

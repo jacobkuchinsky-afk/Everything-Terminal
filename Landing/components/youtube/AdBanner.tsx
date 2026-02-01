@@ -32,7 +32,7 @@ export default function AdBanner({ position }: AdBannerProps) {
         {/* Placeholder shown when ad isn't loaded */}
         {!adLoaded && (
           <div className="ad-placeholder w-full h-full rounded-lg flex items-center justify-center">
-            <span className="text-yt-text-muted text-xs uppercase tracking-widest">Ad Space</span>
+            <span className="text-neutral-400 text-xs uppercase tracking-widest">Ad Space</span>
           </div>
         )}
         <ins
