@@ -31,17 +31,11 @@ def get_download_url(url: str, format: str = "mp4"):
         raise HTTPException(status_code=400, detail="Missing url parameter")
     
     try:
-        # Configure yt-dlp options based on format
-        if format == 'mp3':
-            format_spec = 'bestaudio[ext=m4a]/bestaudio/best'
-        else:
-            format_spec = 'best[ext=mp4][height<=720]/best[ext=mp4]/best[height<=720]/best'
-        
+        # Configure yt-dlp options - keep it simple
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'format': format_spec,
             # Use cookies if available (for authenticated requests)
             'cookiefile': os.environ.get('YOUTUBE_COOKIES_FILE'),
         }
@@ -67,31 +61,39 @@ def get_download_url(url: str, format: str = "mp4"):
             if not download_url:
                 formats = info.get('formats', [])
                 
+                # Filter to only formats with actual video/audio URLs (not thumbnails)
+                valid_formats = [f for f in formats if f.get('url') and 'googlevideo.com' in f.get('url', '')]
+                
                 if format == 'mp3':
-                    # Find audio-only format
-                    audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') in ('none', None) and f.get('url')]
+                    # Find audio format
+                    audio_formats = [f for f in valid_formats if f.get('acodec') and f.get('acodec') != 'none']
                     if audio_formats:
-                        best = max(audio_formats, key=lambda x: x.get('abr') or x.get('tbr') or 0)
+                        # Prefer audio-only, otherwise any with audio
+                        audio_only = [f for f in audio_formats if not f.get('vcodec') or f.get('vcodec') == 'none']
+                        if audio_only:
+                            best = max(audio_only, key=lambda x: x.get('abr') or x.get('tbr') or 0)
+                        else:
+                            best = audio_formats[0]
                         download_url = best.get('url')
                 else:
-                    # Find video format with audio
-                    video_formats = [f for f in formats if f.get('vcodec') not in ('none', None) and f.get('acodec') not in ('none', None) and f.get('url') and 'ytimg.com' not in f.get('url', '')]
-                    if video_formats:
+                    # Find video format (preferably with audio)
+                    video_with_audio = [f for f in valid_formats if f.get('vcodec') and f.get('vcodec') != 'none' and f.get('acodec') and f.get('acodec') != 'none']
+                    video_only = [f for f in valid_formats if f.get('vcodec') and f.get('vcodec') != 'none']
+                    
+                    target_formats = video_with_audio if video_with_audio else video_only
+                    
+                    if target_formats:
                         # Prefer 720p or lower
-                        good = [f for f in video_formats if (f.get('height') or 9999) <= 720]
+                        good = [f for f in target_formats if (f.get('height') or 9999) <= 720]
                         if good:
                             best = max(good, key=lambda x: x.get('height') or 0)
                         else:
-                            best = video_formats[0]
+                            best = min(target_formats, key=lambda x: x.get('height') or 9999)
                         download_url = best.get('url')
-                    
-                    # Last fallback: any format with actual video URL
-                    if not download_url:
-                        for f in formats:
-                            url_candidate = f.get('url', '')
-                            if url_candidate and 'googlevideo.com' in url_candidate:
-                                download_url = url_candidate
-                                break
+                
+                # Ultimate fallback: any googlevideo URL
+                if not download_url and valid_formats:
+                    download_url = valid_formats[0].get('url')
             
             if not download_url:
                 raise HTTPException(status_code=500, detail="Could not extract download URL")
