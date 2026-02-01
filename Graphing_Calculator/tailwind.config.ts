@@ -10,17 +10,18 @@ const config: Config = {
     extend: {
       colors: {
         graph: {
-          bg: "#1a1a2e",
-          sidebar: "#252538",
-          input: "#2d2d44",
-          inputHover: "#363650",
-          grid: "#2a2a40",
-          axes: "#505068",
+          bg: "#2a2a32",
+          sidebar: "#1e1e24",
+          canvas: "#3a3a44",
+          input: "#2d2d38",
+          inputHover: "#38384a",
+          grid: "#4a4a58",
+          axes: "#6a6a7a",
           text: "#e8e8f0",
-          muted: "#8888a0",
+          muted: "#9898a8",
           primary: "#2d70f0",
           primaryHover: "#4080ff",
-          border: "#3a3a50",
+          border: "#3a3a48",
           // Equation colors
           red: "#c74440",
           blue: "#2d70b3",

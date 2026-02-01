@@ -50,6 +50,7 @@ const UTILITY_DEFINITIONS = [
   { label: "Cipher", route: "/cipher" },
   { label: "Color", route: "/color" },
   { label: "Calc", route: "/calc" },
+  { label: "Graph", route: "/graph" },
 ];
 
 // Generate unique ID

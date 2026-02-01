@@ -16,12 +16,15 @@ function sanitizeFilename(name: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const url = searchParams.get('url')
+  const format = searchParams.get('format') || 'mp4'
+  
+  console.log('[download] Request received - URL:', url, 'Format:', format)
+  
   try {
-    const { searchParams } = new URL(request.url)
-    const url = searchParams.get('url')
-    const format = searchParams.get('format') || 'mp4'
-    
     if (!url) {
+      console.log('[download] Error: No URL provided')
       return NextResponse.json(
         { error: 'URL parameter is required' },
         { status: 400 }
@@ -30,15 +33,26 @@ export async function GET(request: NextRequest) {
     
     // Validate YouTube URL
     if (!ytdl.validateURL(url)) {
+      console.log('[download] Error: Invalid YouTube URL')
       return NextResponse.json(
         { error: 'Invalid YouTube URL' },
         { status: 400 }
       )
     }
     
+    console.log('[download] Fetching video info...')
+    
     // Get video info
-    const info = await ytdl.getInfo(url)
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      }
+    })
+    
     const title = sanitizeFilename(info.videoDetails.title)
+    console.log('[download] Video title:', title)
     
     const isAudio = format === 'mp3' || format === 'm4a'
     
@@ -46,12 +60,13 @@ export async function GET(request: NextRequest) {
     let selectedFormat
     
     if (isAudio) {
-      // Get best audio format
+      console.log('[download] Selecting audio format...')
       selectedFormat = ytdl.chooseFormat(info.formats, {
         quality: 'highestaudio',
         filter: 'audioonly'
       })
     } else {
+      console.log('[download] Selecting video format...')
       // Get best video+audio format (mp4 preferred)
       selectedFormat = ytdl.chooseFormat(info.formats, {
         quality: 'highest',
@@ -60,6 +75,7 @@ export async function GET(request: NextRequest) {
       
       // Fallback to any format with video+audio
       if (!selectedFormat) {
+        console.log('[download] No MP4 found, trying fallback...')
         selectedFormat = ytdl.chooseFormat(info.formats, {
           quality: 'highest',
           filter: 'videoandaudio'
@@ -68,11 +84,14 @@ export async function GET(request: NextRequest) {
     }
     
     if (!selectedFormat || !selectedFormat.url) {
+      console.log('[download] Error: No suitable format found')
       return NextResponse.json(
         { error: 'No suitable format found for this video' },
         { status: 404 }
       )
     }
+    
+    console.log('[download] Selected format:', selectedFormat.qualityLabel || selectedFormat.audioBitrate, 'Container:', selectedFormat.container)
     
     // Determine content type and extension
     let contentType: string
@@ -98,6 +117,7 @@ export async function GET(request: NextRequest) {
     }
     
     const filename = `${title}.${extension}`
+    console.log('[download] Streaming file:', filename)
     
     // Fetch the video/audio stream from YouTube
     const response = await fetch(selectedFormat.url, {
@@ -110,11 +130,14 @@ export async function GET(request: NextRequest) {
     })
     
     if (!response.ok || !response.body) {
+      console.log('[download] Error: Failed to fetch stream, status:', response.status)
       return NextResponse.json(
         { error: 'Failed to fetch video stream' },
         { status: 500 }
       )
     }
+    
+    console.log('[download] Stream started successfully')
     
     // Return the stream response
     return new NextResponse(response.body, {
@@ -127,10 +150,30 @@ export async function GET(request: NextRequest) {
       }
     })
     
-  } catch (error) {
-    console.error('Error downloading video:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : ''
+    
+    console.error('[download] Error:', errorMessage)
+    console.error('[download] Stack:', errorStack)
+    
+    // Return more specific error messages
+    if (errorMessage.includes('Sign in to confirm your age')) {
+      return NextResponse.json(
+        { error: 'This video is age-restricted and cannot be downloaded.' },
+        { status: 403 }
+      )
+    }
+    
+    if (errorMessage.includes('private video')) {
+      return NextResponse.json(
+        { error: 'This video is private and cannot be accessed.' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to download video. The video may be private, age-restricted, or unavailable.' },
+      { error: `Failed to download video: ${errorMessage}` },
       { status: 500 }
     )
   }

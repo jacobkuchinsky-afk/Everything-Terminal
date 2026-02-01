@@ -5,17 +5,18 @@
 @tailwind utilities;
 
 :root {
-  --graph-bg: #1a1a2e;
-  --graph-sidebar: #252538;
-  --graph-input: #2d2d44;
-  --graph-input-hover: #363650;
-  --graph-grid: #2a2a40;
-  --graph-axes: #505068;
+  --graph-bg: #2a2a32;
+  --graph-sidebar: #1e1e24;
+  --graph-canvas: #3a3a44;
+  --graph-input: #2d2d38;
+  --graph-input-hover: #38384a;
+  --graph-grid: #4a4a58;
+  --graph-axes: #6a6a7a;
   --graph-text: #e8e8f0;
-  --graph-muted: #8888a0;
+  --graph-muted: #9898a8;
   --graph-primary: #2d70f0;
   --graph-primary-hover: #4080ff;
-  --graph-border: #3a3a50;
+  --graph-border: #3a3a48;
   
   /* Equation colors */
   --eq-red: #c74440;

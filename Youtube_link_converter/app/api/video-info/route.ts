@@ -18,11 +18,14 @@ function formatDuration(seconds: number): string {
 }
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const url = searchParams.get('url')
+  
+  console.log('[video-info] Request received for URL:', url)
+  
   try {
-    const { searchParams } = new URL(request.url)
-    const url = searchParams.get('url')
-    
     if (!url) {
+      console.log('[video-info] Error: No URL provided')
       return NextResponse.json(
         { error: 'URL parameter is required' },
         { status: 400 }
@@ -31,14 +34,26 @@ export async function GET(request: NextRequest) {
     
     // Validate YouTube URL
     if (!ytdl.validateURL(url)) {
+      console.log('[video-info] Error: Invalid YouTube URL')
       return NextResponse.json(
         { error: 'Invalid YouTube URL' },
         { status: 400 }
       )
     }
     
-    // Get video info
-    const info = await ytdl.getInfo(url)
+    console.log('[video-info] Fetching info from YouTube...')
+    
+    // Get video info with custom agent options
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      }
+    })
+    
+    console.log('[video-info] Successfully fetched video info')
+    
     const { videoDetails } = info
     
     // Get best thumbnail
@@ -59,10 +74,37 @@ export async function GET(request: NextRequest) {
       }
     })
     
-  } catch (error) {
-    console.error('Error fetching video info:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : ''
+    
+    console.error('[video-info] Error:', errorMessage)
+    console.error('[video-info] Stack:', errorStack)
+    
+    // Return more specific error messages
+    if (errorMessage.includes('Sign in to confirm your age')) {
+      return NextResponse.json(
+        { error: 'This video is age-restricted and cannot be downloaded.' },
+        { status: 403 }
+      )
+    }
+    
+    if (errorMessage.includes('private video')) {
+      return NextResponse.json(
+        { error: 'This video is private and cannot be accessed.' },
+        { status: 403 }
+      )
+    }
+    
+    if (errorMessage.includes('Video unavailable')) {
+      return NextResponse.json(
+        { error: 'This video is unavailable.' },
+        { status: 404 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch video information. The video may be private or unavailable.' },
+      { error: `Failed to fetch video information: ${errorMessage}` },
       { status: 500 }
     )
   }
