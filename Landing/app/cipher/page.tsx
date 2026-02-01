@@ -13,7 +13,7 @@ export default function CipherPage() {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
-        <span className="text-sm">Home</span>
+        <span className="text-sm text-cipher-text-muted">Home</span>
       </Link>
       
       {/* Subtle gradient overlay */}
