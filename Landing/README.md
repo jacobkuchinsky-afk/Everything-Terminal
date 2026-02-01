@@ -2,6 +2,8 @@
 
 An interactive circuit board visualization built with Next.js, featuring a realistic PCB aesthetic with configurable interactive pin buttons.
 
+🚀 **Live Demo**: [everything-terminal.vercel.app](https://everything-terminal.vercel.app)
+
 ## Features
 
 - **Realistic PCB Design**: Classic green circuit board with copper traces, vias, and silkscreen elements
