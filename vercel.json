@@ -1,9 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "Landing/package.json",
-      "use": "@vercel/next"
-    }
-  ]
+  "installCommand": "cd Landing && npm install",
+  "buildCommand": "cd Landing && npm run build",
+  "outputDirectory": "Landing/.next"
 }
