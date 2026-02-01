@@ -233,7 +233,7 @@ export default function ConverterCard() {
         <FormatSelector value={format} onChange={setFormat} />
         <button
           onClick={handleConvert}
-          disabled={status !== 'ready' || !videoInfo || status === 'downloading'}
+          disabled={status !== 'ready' || !videoInfo}
           className="px-8 py-3 bg-yt-red hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center gap-2"
         >
           {status === 'downloading' ? (
