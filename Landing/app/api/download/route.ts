@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Force redeploy - v4 - more debug logging for Cobalt
+// Force redeploy - v5 - use public cobalt instance
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 // #region agent log
-console.log('[DEBUG] Landing download module loaded - v4');
+console.log('[DEBUG] Landing download module loaded - v5');
 // #endregion
 
 // Extract video ID from YouTube URL
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get('format') || 'mp4'
   
   // #region agent log
-  console.log('[DEBUG-DL-H1] download API called - v4, url:', url, 'format:', format);
+  console.log('[DEBUG-DL] download API called - v5, url:', url, 'format:', format);
   // #endregion
   
   try {
@@ -45,116 +45,111 @@ export async function GET(request: NextRequest) {
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     const isAudio = format === 'mp3' || format === 'm4a'
     
-    // #region agent log
-    console.log('[DEBUG-DL-H2] Calling Cobalt API for:', youtubeUrl);
-    // #endregion
+    // Try multiple public cobalt instances
+    const cobaltInstances = [
+      'https://co.wuk.sh/api/json',
+      'https://cobalt.api.timelessnesses.me/api/json',
+      'https://api.cobalt.best/api/json'
+    ]
     
-    // Use Cobalt API for downloading
     const cobaltBody = {
       url: youtubeUrl,
-      downloadMode: isAudio ? 'audio' : 'auto',
-      audioFormat: isAudio ? 'mp3' : undefined,
-      videoQuality: '720',
-      filenameStyle: 'basic'
+      vCodec: 'h264',
+      vQuality: '720',
+      aFormat: isAudio ? 'mp3' : 'mp3',
+      filenamePattern: 'basic',
+      isAudioOnly: isAudio
     }
     
     // #region agent log
-    console.log('[DEBUG-DL-H2] Cobalt request body:', JSON.stringify(cobaltBody));
+    console.log('[DEBUG-DL] Cobalt request body:', JSON.stringify(cobaltBody));
     // #endregion
     
-    const cobaltResponse = await fetch('https://api.cobalt.tools/', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(cobaltBody)
-    })
+    let cobaltData: { status?: string; url?: string; error?: { code?: string }; text?: string; picker?: Array<{ type: string; url: string }> } | null = null
+    let lastError = ''
     
-    // #region agent log
-    console.log('[DEBUG-DL-H1] Cobalt response status:', cobaltResponse.status, 'ok:', cobaltResponse.ok);
-    // #endregion
+    for (const instance of cobaltInstances) {
+      try {
+        // #region agent log
+        console.log('[DEBUG-DL] Trying cobalt instance:', instance);
+        // #endregion
+        
+        const cobaltResponse = await fetch(instance, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(cobaltBody)
+        })
+        
+        // #region agent log
+        console.log('[DEBUG-DL] Instance response status:', cobaltResponse.status);
+        // #endregion
+        
+        if (cobaltResponse.ok) {
+          const text = await cobaltResponse.text()
+          // #region agent log
+          console.log('[DEBUG-DL] Instance response:', text.substring(0, 300));
+          // #endregion
+          
+          cobaltData = JSON.parse(text)
+          
+          if (cobaltData?.status !== 'error') {
+            break // Found a working instance
+          }
+          lastError = cobaltData?.error?.code || cobaltData?.text || 'Unknown error'
+        }
+      } catch (e) {
+        // #region agent log
+        console.log('[DEBUG-DL] Instance failed:', instance, e);
+        // #endregion
+        lastError = e instanceof Error ? e.message : 'Request failed'
+      }
+    }
     
-    const cobaltText = await cobaltResponse.text()
-    
-    // #region agent log
-    console.log('[DEBUG-DL-H2] Cobalt raw response:', cobaltText.substring(0, 500));
-    // #endregion
-    
-    if (!cobaltResponse.ok) {
-      console.error('[DEBUG-DL-H1] Cobalt API error status:', cobaltResponse.status)
+    if (!cobaltData || cobaltData.status === 'error') {
+      console.error('[DEBUG-DL] All cobalt instances failed, last error:', lastError)
       return NextResponse.json(
-        { error: `Download service error: ${cobaltResponse.status}` },
+        { error: `Download service unavailable: ${lastError}` },
         { status: 503 }
       )
     }
     
-    let cobaltData
-    try {
-      cobaltData = JSON.parse(cobaltText)
-    } catch (e) {
-      console.error('[DEBUG-DL-H2] Failed to parse Cobalt response:', e)
-      return NextResponse.json(
-        { error: 'Invalid response from download service' },
-        { status: 500 }
-      )
-    }
-    
     // #region agent log
-    console.log('[DEBUG-DL-H3] Cobalt data status:', cobaltData.status, 'keys:', Object.keys(cobaltData));
+    console.log('[DEBUG-DL] Cobalt success, status:', cobaltData.status);
     // #endregion
-    
-    if (cobaltData.status === 'error') {
-      console.error('[DEBUG-DL-H3] Cobalt error:', cobaltData.error)
-      return NextResponse.json(
-        { error: cobaltData.error?.code || cobaltData.text || 'Failed to process video' },
-        { status: 400 }
-      )
-    }
     
     // Get the download URL from Cobalt response
     let downloadUrl = cobaltData.url
     
-    // Handle different response types
+    // Handle picker response
     if (cobaltData.status === 'picker' && cobaltData.picker) {
-      // #region agent log
-      console.log('[DEBUG-DL-H4] Picker response, items:', cobaltData.picker.length);
-      // #endregion
       const picker = cobaltData.picker
       if (isAudio) {
-        downloadUrl = picker.find((p: { type: string }) => p.type === 'audio')?.url || picker[0]?.url
+        downloadUrl = picker.find((p) => p.type === 'audio')?.url || picker[0]?.url
       } else {
-        downloadUrl = picker.find((p: { type: string }) => p.type === 'video')?.url || picker[0]?.url
+        downloadUrl = picker.find((p) => p.type === 'video')?.url || picker[0]?.url
       }
-    } else if (cobaltData.status === 'redirect' || cobaltData.status === 'tunnel') {
-      downloadUrl = cobaltData.url
-    } else if (cobaltData.status === 'stream') {
-      downloadUrl = cobaltData.url
     }
     
     // #region agent log
-    console.log('[DEBUG-DL-H4] Final download URL exists:', !!downloadUrl, 'length:', downloadUrl?.length || 0);
+    console.log('[DEBUG-DL] Download URL exists:', !!downloadUrl);
     // #endregion
     
     if (!downloadUrl) {
       return NextResponse.json(
-        { error: 'Could not get download URL from service' },
+        { error: 'Could not get download URL' },
         { status: 500 }
       )
     }
-    
-    // #region agent log
-    console.log('[DEBUG-DL] Redirecting to download URL');
-    // #endregion
     
     // Redirect to the download URL
     return NextResponse.redirect(downloadUrl)
     
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorStack = error instanceof Error ? error.stack : ''
-    console.error('[DEBUG-DL-H5] Uncaught error:', errorMessage)
-    console.error('[DEBUG-DL-H5] Stack:', errorStack)
+    console.error('[DEBUG-DL] Uncaught error:', errorMessage)
     
     return NextResponse.json(
       { error: `Failed to download: ${errorMessage}` },
