@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { CipherInterface } from '@/components/cipher/CipherInterface';
+import AdPlaceholder from '@/components/AdPlaceholder';
 
 export default function CipherPage() {
   return (
-    <main className="min-h-screen bg-cipher-dark grid-pattern relative">
+    <main className="min-h-screen bg-cipher-dark grid-pattern relative flex flex-col">
       {/* Back to Home */}
       <Link 
         href="/" 
@@ -18,13 +19,16 @@ export default function CipherPage() {
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-cipher-primary/5 via-transparent to-transparent pointer-events-none" />
       
+      {/* Top Ad Banner */}
+      <AdPlaceholder variant="banner" position="top" />
+      
       {/* Main content */}
-      <div className="relative z-10 py-12 md:py-16 lg:py-20">
+      <div className="relative z-10 flex-1 py-12 md:py-16 lg:py-20">
         <CipherInterface />
       </div>
       
       {/* Footer */}
-      <footer className="relative z-10 pb-8 text-center">
+      <footer className="relative z-10 pb-4 text-center">
         <div className="inline-flex items-center gap-3 text-xs text-cipher-text-muted">
           <span className="w-8 h-px bg-cipher-border" />
           <span>12 Cipher Algorithms</span>
@@ -33,6 +37,9 @@ export default function CipherPage() {
           <span className="w-8 h-px bg-cipher-border" />
         </div>
       </footer>
+      
+      {/* Bottom Ad Banner */}
+      <AdPlaceholder variant="banner" position="bottom" />
     </main>
   );
 }

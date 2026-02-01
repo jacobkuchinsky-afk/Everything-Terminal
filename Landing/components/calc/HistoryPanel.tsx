@@ -54,7 +54,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-sm font-medium">No calculations yet</p>
+            <p className="text-sm font-medium text-calc-textMuted">No calculations yet</p>
             <p className="text-xs text-calc-textMuted mt-1">Your history will appear here</p>
           </div>
         ) : (

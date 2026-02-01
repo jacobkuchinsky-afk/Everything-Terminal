@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { Calculator } from '@/components/calc/Calculator';
+import AdPlaceholder from '@/components/AdPlaceholder';
 
 export default function CalcPage() {
   return (
-    <main className="min-h-screen bg-calc-black dot-pattern relative overflow-hidden flex items-center justify-center p-4">
+    <main className="min-h-screen bg-calc-black dot-pattern relative overflow-hidden flex flex-col">
       {/* Back to Home */}
       <Link 
         href="/" 
@@ -14,6 +15,9 @@ export default function CalcPage() {
         </svg>
         <span className="text-sm">Home</span>
       </Link>
+      
+      {/* Top Ad Banner */}
+      <AdPlaceholder variant="banner" position="top" />
       
       {/* Decorative corner accents */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -43,9 +47,12 @@ export default function CalcPage() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10">
+      <div className="flex-1 flex items-center justify-center p-4 relative z-10">
         <Calculator />
       </div>
+      
+      {/* Bottom Ad Banner */}
+      <AdPlaceholder variant="banner" position="bottom" />
     </main>
   );
 }

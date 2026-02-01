@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { ColorPicker } from '@/components/color/ColorPicker';
+import AdPlaceholder from '@/components/AdPlaceholder';
 
 export default function ColorPage() {
   return (
-    <main className="min-h-screen bg-picker-dark grid-pattern relative overflow-hidden">
+    <main className="min-h-screen bg-picker-dark grid-pattern relative overflow-hidden flex flex-col">
       {/* Back to Home */}
       <Link 
         href="/" 
@@ -48,17 +49,23 @@ export default function ColorPage() {
         <div className="absolute top-2/3 right-0 w-8 h-[1px] bg-gradient-to-l from-picker-muted/30 to-transparent" />
       </div>
       
+      {/* Top Ad Banner */}
+      <AdPlaceholder variant="banner" position="top" />
+      
       {/* Main content */}
-      <div className="relative z-10 py-8 md:py-12">
+      <div className="relative z-10 flex-1 py-8 md:py-12">
         <ColorPicker />
       </div>
       
       {/* Footer */}
-      <footer className="absolute bottom-0 left-0 right-0 py-4 text-center text-xs text-picker-muted tracking-wider">
+      <footer className="relative z-10 py-4 text-center text-xs text-picker-muted tracking-wider">
         <span className="border-t border-picker-border pt-4 px-8 inline-block uppercase">
           8 Color Formats • One-Click Copy
         </span>
       </footer>
+      
+      {/* Bottom Ad Banner */}
+      <AdPlaceholder variant="banner" position="bottom" />
     </main>
   );
 }

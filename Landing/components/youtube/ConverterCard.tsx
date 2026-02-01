@@ -106,7 +106,7 @@ export default function ConverterCard() {
   return (
     <div className="converter-card w-full max-w-2xl mx-auto p-8 md:p-10 rounded-2xl">
       {/* Title */}
-      <h1 className="text-3xl md:text-4xl font-black text-center mb-2 tracking-tight">
+      <h1 className="text-3xl md:text-4xl font-black text-center mb-2 tracking-tight text-yt-text">
         Youtube link to <span className="text-yt-red">mp4</span>
       </h1>
       
