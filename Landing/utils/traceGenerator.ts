@@ -35,10 +35,10 @@ interface GeneratorConfig {
 }
 
 const DEFAULT_CONFIG: GeneratorConfig = {
-  pinCount: 4,
+  pinCount: 5,
   cellSize: 70,
   traceWidth: 8,
-  minPinSpacing: 6,
+  minPinSpacing: 4,
   viaChance: 0.03,
   decorativeTraceCount: 2,
   borderExtension: 3,

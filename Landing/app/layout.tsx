@@ -20,7 +20,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body>{children}</body>
+      <body className="text-white antialiased">{children}</body>
     </html>
   );
 }
