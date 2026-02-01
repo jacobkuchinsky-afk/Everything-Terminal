@@ -109,19 +109,15 @@ export default function ConverterCard() {
     const videoId = videoInfo.id
     const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
-    // Railway backend URL (set in Vercel environment variables)
-    const backendUrl = process.env.NEXT_PUBLIC_YOUTUBE_API_URL
-    
-    if (!backendUrl) {
-      setError('Backend not configured. Please set NEXT_PUBLIC_YOUTUBE_API_URL.')
-      setStatus('error')
-      return
-    }
+    // Railway backend URL
+    const backendUrl = 'https://everything-terminal-production.up.railway.app'
 
     try {
       // Call Railway Python backend
       const apiUrl = `${backendUrl}/api/download?url=${encodeURIComponent(fullYouTubeUrl)}&format=${format}`
+      console.log('[DEBUG] Calling:', apiUrl)
       const response = await fetch(apiUrl)
+      console.log('[DEBUG] Response status:', response.status)
 
       const data = await response.json()
 
