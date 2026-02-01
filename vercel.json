@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd Landing && npm install",
+  "installCommand": "npm install && cd Landing && npm install",
   "buildCommand": "cd Landing && npm run build",
   "outputDirectory": "Landing/.next"
 }
