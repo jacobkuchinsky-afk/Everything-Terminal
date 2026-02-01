@@ -98,7 +98,7 @@ export default function ConverterCard() {
     return () => clearTimeout(timer)
   }, [url, isValidUrl, fetchVideoInfo])
 
-  // Handle convert - call Cobalt API directly from browser
+  // Handle convert - call Python yt-dlp backend
   const handleConvert = async () => {
     if (!videoInfo || !url) return
 
@@ -110,68 +110,40 @@ export default function ConverterCard() {
     const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
     // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Calling Cobalt API from browser',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Calling Python yt-dlp API',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
     // #endregion
 
     try {
-      // Call Cobalt API directly from browser (user's IP)
-      const cobaltResponse = await fetch('https://api.cobalt.tools/', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: fullYouTubeUrl,
-          downloadMode: format === 'mp3' ? 'audio' : 'auto',
-          audioFormat: 'mp3',
-          videoQuality: '720',
-        })
-      })
+      // Call our Python yt-dlp API
+      const apiUrl = `/api/ytdl?url=${encodeURIComponent(fullYouTubeUrl)}&format=${format}`
+      const response = await fetch(apiUrl)
 
       // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt response received',data:{status:cobaltResponse.status,ok:cobaltResponse.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API response',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
       // #endregion
 
-      const data = await cobaltResponse.json()
+      const data = await response.json()
       
       // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt data parsed',data:{status:data.status,hasUrl:!!data.url,error:data.error},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API data',data:{success:data.success,hasDownloadUrl:!!data.download_url,error:data.error},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
       // #endregion
 
-      if (data.status === 'error') {
-        throw new Error(data.error?.code || 'Download failed')
+      if (!data.success) {
+        throw new Error(data.error || 'Download failed')
       }
 
-      if (data.status === 'tunnel' || data.status === 'redirect') {
-        // Direct download URL
-        setDownloadUrl(data.url)
+      if (data.download_url) {
+        setDownloadUrl(data.download_url)
         setStatus('ready')
         
-        // Auto-trigger download
-        const link = document.createElement('a')
-        link.href = data.url
-        link.download = `${videoInfo.title}.${format}`
-        link.target = '_blank'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } else if (data.status === 'picker') {
-        // Multiple options - use first one
-        if (data.picker && data.picker.length > 0) {
-          const firstOption = data.picker[0]
-          setDownloadUrl(firstOption.url)
-          setStatus('ready')
-          window.open(firstOption.url, '_blank')
-        } else {
-          throw new Error('No download options available')
-        }
+        // Open download URL in new tab
+        window.open(data.download_url, '_blank')
       } else {
-        throw new Error('Unexpected response from server')
+        throw new Error('No download URL available')
       }
     } catch (err) {
       // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt error',data:{error:err instanceof Error ? err.message : 'Unknown error'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API error',data:{error:err instanceof Error ? err.message : 'Unknown error'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
       // #endregion
       
       setError(err instanceof Error ? err.message : 'Download failed')
