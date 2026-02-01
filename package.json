@@ -1,0 +1,9 @@
+{
+  "name": "everything-terminal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Everything Terminal - A collection of web tools",
+  "dependencies": {
+    "next": "^16.1.6"
+  }
+}
