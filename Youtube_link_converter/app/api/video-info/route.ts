@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Force redeploy - v2 - no ytdl-core, just video ID extraction
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 // #region agent log
 console.log('[DEBUG] video-info module loaded');
