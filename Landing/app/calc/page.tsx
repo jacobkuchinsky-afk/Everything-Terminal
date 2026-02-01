@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from 'next/link'
 import { Calculator } from '@/components/calc/Calculator';
 import AdPlaceholder from '@/components/AdPlaceholder';
+
+export const metadata: Metadata = {
+  title: "Calculator",
+  description: "Free online scientific calculator with calculation history. Perform basic arithmetic, percentages, and complex calculations instantly. Clean interface with keyboard support.",
+  keywords: ["online calculator", "scientific calculator", "free calculator", "math calculator", "calculation history", "web calculator", "arithmetic calculator"],
+  openGraph: {
+    title: "Calculator | Everything Terminal",
+    description: "Free online scientific calculator with calculation history. Perform basic and complex calculations instantly.",
+    type: "website",
+  },
+};
 
 export default function CalcPage() {
   return (

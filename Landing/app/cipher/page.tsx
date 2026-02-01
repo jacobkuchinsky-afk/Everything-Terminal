@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from 'next/link'
 import { CipherInterface } from '@/components/cipher/CipherInterface';
 import AdPlaceholder from '@/components/AdPlaceholder';
+
+export const metadata: Metadata = {
+  title: "Cipher Encoder & Decoder",
+  description: "Free online cipher encoder and decoder with 12+ algorithms including Caesar, Vigenère, ROT13, Base64, Binary, Morse code, Playfair, and more. Encrypt and decrypt text instantly.",
+  keywords: ["cipher encoder", "cipher decoder", "caesar cipher", "vigenere cipher", "rot13", "base64 encoder", "binary converter", "morse code translator", "encryption tool", "decryption tool", "text encoder"],
+  openGraph: {
+    title: "Cipher Encoder & Decoder | Everything Terminal",
+    description: "Free online cipher encoder and decoder with 12+ algorithms including Caesar, Vigenère, ROT13, Base64, Binary, and Morse code.",
+    type: "website",
+  },
+};
 
 export default function CipherPage() {
   return (

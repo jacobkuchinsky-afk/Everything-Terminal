@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import yt_dlp
+from pytube import YouTube
+from pytube.exceptions import VideoUnavailable, RegexMatchError
 import os
 
 app = FastAPI(title="YouTube Downloader API")
@@ -8,7 +9,7 @@ app = FastAPI(title="YouTube Downloader API")
 # Allow CORS from your Vercel frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, set this to your Vercel domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -21,7 +22,7 @@ def health_check():
 @app.get("/api/download")
 def get_download_url(url: str, format: str = "mp4"):
     """
-    Get download URL for a YouTube video.
+    Get download URL for a YouTube video using pytube.
     
     Args:
         url: YouTube video URL
@@ -31,78 +32,58 @@ def get_download_url(url: str, format: str = "mp4"):
         raise HTTPException(status_code=400, detail="Missing url parameter")
     
     try:
-        # Configure yt-dlp options
-        # Use 'best' to get pre-merged format (no post-processing needed)
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': False,
-            'format': 'best',  # Single file with video+audio, no merging needed
-            'cookiefile': os.environ.get('YOUTUBE_COOKIES_FILE'),
-        }
+        # Create YouTube object
+        yt = YouTube(url)
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+        # Get video info
+        title = yt.title
+        author = yt.author
+        duration = yt.length
+        thumbnail = yt.thumbnail_url
+        
+        # Get stream based on format
+        if format == 'mp3':
+            # Get best audio stream
+            stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+            if not stream:
+                stream = yt.streams.filter(only_audio=True).first()
+        else:
+            # Get best progressive stream (video + audio in single file)
+            # Progressive streams have both video and audio, no merging needed
+            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+            if not stream:
+                # Fallback to any progressive stream
+                stream = yt.streams.filter(progressive=True).first()
+        
+        if not stream:
+            raise HTTPException(status_code=500, detail="No suitable stream found")
+        
+        # Get the direct download URL
+        download_url = stream.url
+        
+        return {
+            "success": True,
+            "title": title,
+            "author": author,
+            "duration": duration,
+            "thumbnail": thumbnail,
+            "download_url": download_url,
+            "format": format,
+            "quality": getattr(stream, 'resolution', None) or getattr(stream, 'abr', 'unknown')
+        }
             
-            if not info:
-                raise HTTPException(status_code=404, detail="Video not found")
-            
-            # Get the direct URL
-            download_url = info.get('url')
-            
-            # If no direct URL, search through formats manually
-            if not download_url:
-                formats = info.get('formats', [])
-                
-                # Filter to only formats with actual video/audio URLs (not thumbnails)
-                valid_formats = [f for f in formats if f.get('url') and 'googlevideo.com' in f.get('url', '')]
-                
-                if format == 'mp3':
-                    # Find audio format
-                    audio_formats = [f for f in valid_formats if f.get('acodec') and f.get('acodec') != 'none']
-                    if audio_formats:
-                        best = max(audio_formats, key=lambda x: x.get('abr') or x.get('tbr') or 0)
-                        download_url = best.get('url')
-                else:
-                    # Find video format with audio (single file)
-                    video_with_audio = [f for f in valid_formats if f.get('vcodec') and f.get('vcodec') != 'none' and f.get('acodec') and f.get('acodec') != 'none']
-                    
-                    if video_with_audio:
-                        # Prefer 720p or lower
-                        good = [f for f in video_with_audio if (f.get('height') or 9999) <= 720]
-                        if good:
-                            best = max(good, key=lambda x: x.get('height') or 0)
-                        else:
-                            best = video_with_audio[0]
-                        download_url = best.get('url')
-                
-                # Ultimate fallback: any googlevideo URL
-                if not download_url and valid_formats:
-                    download_url = valid_formats[0].get('url')
-            
-            if not download_url:
-                raise HTTPException(status_code=500, detail="Could not extract download URL")
-            
-            return {
-                "success": True,
-                "title": info.get('title', 'Unknown'),
-                "author": info.get('uploader', 'Unknown'),
-                "duration": info.get('duration', 0),
-                "thumbnail": info.get('thumbnail', ''),
-                "download_url": download_url,
-                "format": format
-            }
-            
-    except yt_dlp.utils.DownloadError as e:
+    except VideoUnavailable:
+        raise HTTPException(status_code=404, detail="Video is unavailable or private")
+    except RegexMatchError:
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    except Exception as e:
         error_msg = str(e)
-        if 'Sign in' in error_msg or 'bot' in error_msg.lower():
+        if 'Sign in' in error_msg or 'bot' in error_msg.lower() or 'confirm' in error_msg.lower():
             raise HTTPException(
                 status_code=403, 
-                detail="YouTube is temporarily blocking requests. Please try again in a few minutes."
+                detail="YouTube is temporarily blocking requests. Please try again later."
             )
-        raise HTTPException(status_code=500, detail=f"Download error: {error_msg}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {error_msg}")
 
 @app.get("/api/info")
 def get_video_info(url: str):
@@ -111,28 +92,20 @@ def get_video_info(url: str):
         raise HTTPException(status_code=400, detail="Missing url parameter")
     
     try:
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': True,
-        }
+        yt = YouTube(url)
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
-            if not info:
-                raise HTTPException(status_code=404, detail="Video not found")
-            
-            return {
-                "success": True,
-                "id": info.get('id', ''),
-                "title": info.get('title', 'Unknown'),
-                "author": info.get('uploader', 'Unknown'),
-                "duration": info.get('duration', 0),
-                "thumbnail": info.get('thumbnail', ''),
-                "view_count": info.get('view_count', 0),
-                "description": info.get('description', '')[:500] if info.get('description') else ''
-            }
+        return {
+            "success": True,
+            "id": yt.video_id,
+            "title": yt.title,
+            "author": yt.author,
+            "duration": yt.length,
+            "thumbnail": yt.thumbnail_url,
+            "view_count": yt.views,
+            "description": yt.description[:500] if yt.description else ''
+        }
+    except VideoUnavailable:
+        raise HTTPException(status_code=404, detail="Video is unavailable or private")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
