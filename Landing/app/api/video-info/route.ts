@@ -1,65 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
-import ytdl from '@distube/ytdl-core'
 
-// Format duration from seconds to MM:SS or HH:MM:SS
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
+// Force redeploy - v3 - no ytdl-core, client-side oEmbed
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+
+// #region agent log
+console.log('[DEBUG] Landing video-info module loaded - v3');
+// #endregion
+
+// Extract video ID from YouTube URL
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ]
   
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`
+  return null
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const url = searchParams.get('url')
-    
-    if (!url) {
-      return NextResponse.json(
-        { error: 'URL parameter is required' },
-        { status: 400 }
-      )
-    }
-    
-    // Validate YouTube URL
-    if (!ytdl.validateURL(url)) {
-      return NextResponse.json(
-        { error: 'Invalid YouTube URL' },
-        { status: 400 }
-      )
-    }
-    
-    // Get video info
-    const info = await ytdl.getInfo(url)
-    const { videoDetails } = info
-    
-    // Get best thumbnail
-    const thumbnails = videoDetails.thumbnails
-    const thumbnail = thumbnails[thumbnails.length - 1]?.url || ''
-    
-    return NextResponse.json({
-      success: true,
-      video: {
-        id: videoDetails.videoId,
-        title: videoDetails.title,
-        author: videoDetails.author.name,
-        duration: formatDuration(parseInt(videoDetails.lengthSeconds)),
-        durationSeconds: parseInt(videoDetails.lengthSeconds),
-        thumbnail: thumbnail,
-        views: parseInt(videoDetails.viewCount) || 0,
-        description: videoDetails.description || ''
-      }
-    })
-    
-  } catch (error) {
-    console.error('Error fetching video info:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch video information. The video may be private or unavailable.' },
-      { status: 500 }
-    )
+  // #region agent log
+  console.log('[DEBUG] video-info API called - v3 (no ytdl)');
+  // #endregion
+  
+  const { searchParams } = new URL(request.url)
+  const url = searchParams.get('url')
+  
+  if (!url) {
+    return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 })
   }
+  
+  const videoId = extractVideoId(url)
+  
+  if (!videoId) {
+    return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
+  }
+  
+  // Return just the video ID - client will fetch oEmbed directly
+  // This avoids YouTube blocking Vercel's IP
+  return NextResponse.json({
+    success: true,
+    videoId: videoId,
+    // Provide oEmbed URL for client to fetch
+    oembedUrl: `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+    thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+  })
 }
