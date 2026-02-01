@@ -1,4 +1,4 @@
 fastapi==0.109.0
 uvicorn==0.27.0
-pytubefix==8.9.2
+pytubefix==10.3.6
 python-multipart==0.0.6
