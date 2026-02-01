@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ytdl from '@distube/ytdl-core'
 
+// Force Node.js runtime (not Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // Format duration from seconds to MM:SS or HH:MM:SS
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600)

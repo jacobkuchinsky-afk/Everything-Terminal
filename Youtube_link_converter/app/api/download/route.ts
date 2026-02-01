@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ytdl from '@distube/ytdl-core'
 
+// Force Node.js runtime (not Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+// Increase timeout for large video downloads
+export const maxDuration = 60
+
 // Sanitize filename
 function sanitizeFilename(name: string): string {
   return name
