@@ -36,7 +36,7 @@ def get_download_url(url: str, format: str = "mp4"):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'format': 'bestaudio/best' if format == 'mp3' else 'best[height<=720]/best',
+            # Don't specify format - let yt-dlp choose best available
             # Use cookies if available (for authenticated requests)
             'cookiefile': os.environ.get('YOUTUBE_COOKIES_FILE'),
         }
