@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ytdl from '@distube/ytdl-core'
 
-// Force redeploy - v7 - back to ytdl-core
+// Force redeploy - v8 - fix read-only filesystem
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 // #region agent log
-console.log('[DEBUG] download module loaded - v7 (ytdl-core)');
+console.log('[DEBUG] download module loaded - v8');
 // #endregion
 
 // Sanitize filename
@@ -18,13 +18,18 @@ function sanitizeFilename(name: string): string {
     .substring(0, 100)
 }
 
+// Create agent with no file caching
+const agent = ytdl.createAgent(undefined, {
+  localAddress: undefined,
+})
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const url = searchParams.get('url')
   const format = searchParams.get('format') || 'mp4'
   
   // #region agent log
-  console.log('[DEBUG-DL] download called - v7, url:', url, 'format:', format);
+  console.log('[DEBUG-DL] download called - v8, url:', url, 'format:', format);
   // #endregion
   
   try {
@@ -41,17 +46,13 @@ export async function GET(request: NextRequest) {
     console.log('[DEBUG-DL] Getting video info');
     // #endregion
     
-    // Get video info with custom request options
+    // Get video info
     const info = await ytdl.getInfo(url, {
+      agent,
       requestOptions: {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Cache-Control': 'max-age=0'
+          'Accept-Language': 'en-US,en;q=0.9',
         }
       }
     })

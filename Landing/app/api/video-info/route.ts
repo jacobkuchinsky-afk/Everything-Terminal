@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ytdl from '@distube/ytdl-core'
 
-// Force redeploy - v7 - back to ytdl-core
+// Force redeploy - v8 - fix read-only filesystem
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
 // #region agent log
-console.log('[DEBUG] video-info module loaded - v7 (ytdl-core)');
+console.log('[DEBUG] video-info module loaded - v8');
 // #endregion
 
 // Format duration from seconds to MM:SS or HH:MM:SS
@@ -22,12 +22,17 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${secs.toString().padStart(2, '0')}`
 }
 
+// Create agent with no file caching
+const agent = ytdl.createAgent(undefined, {
+  localAddress: undefined,
+})
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const url = searchParams.get('url')
   
   // #region agent log
-  console.log('[DEBUG-VI] video-info called - v7, url:', url);
+  console.log('[DEBUG-VI] video-info called - v8, url:', url);
   // #endregion
   
   try {
@@ -44,17 +49,13 @@ export async function GET(request: NextRequest) {
     console.log('[DEBUG-VI] Fetching video info with ytdl-core');
     // #endregion
     
-    // Get video info with custom request options
-    const info = await ytdl.getInfo(url, {
+    // Get video info - disable file writing by not using playerClients that write files
+    const info = await ytdl.getBasicInfo(url, {
+      agent,
       requestOptions: {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Cache-Control': 'max-age=0'
+          'Accept-Language': 'en-US,en;q=0.9',
         }
       }
     })
