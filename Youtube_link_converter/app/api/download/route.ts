@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import ytdl from '@distube/ytdl-core'
 
-// Force Node.js runtime (not Edge)
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-// Increase timeout for large video downloads
 export const maxDuration = 60
 
-// Sanitize filename
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[<>:"/\\|?*]/g, '')
-    .replace(/\s+/g, '_')
-    .substring(0, 100)
+// Extract video ID from YouTube URL
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ]
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -20,157 +23,80 @@ export async function GET(request: NextRequest) {
   const url = searchParams.get('url')
   const format = searchParams.get('format') || 'mp4'
   
-  console.log('[download] Request received - URL:', url, 'Format:', format)
-  
   try {
     if (!url) {
-      console.log('[download] Error: No URL provided')
-      return NextResponse.json(
-        { error: 'URL parameter is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 })
     }
     
-    // Validate YouTube URL
-    if (!ytdl.validateURL(url)) {
-      console.log('[download] Error: Invalid YouTube URL')
-      return NextResponse.json(
-        { error: 'Invalid YouTube URL' },
-        { status: 400 }
-      )
+    const videoId = extractVideoId(url)
+    if (!videoId) {
+      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
     
-    console.log('[download] Fetching video info...')
-    
-    // Get video info
-    const info = await ytdl.getInfo(url, {
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        }
-      }
-    })
-    
-    const title = sanitizeFilename(info.videoDetails.title)
-    console.log('[download] Video title:', title)
-    
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     const isAudio = format === 'mp3' || format === 'm4a'
     
-    // Select the appropriate format
-    let selectedFormat
-    
-    if (isAudio) {
-      console.log('[download] Selecting audio format...')
-      selectedFormat = ytdl.chooseFormat(info.formats, {
-        quality: 'highestaudio',
-        filter: 'audioonly'
+    // Use Cobalt API for downloading
+    const cobaltResponse = await fetch('https://api.cobalt.tools/', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: youtubeUrl,
+        downloadMode: isAudio ? 'audio' : 'auto',
+        audioFormat: isAudio ? 'mp3' : undefined,
+        videoQuality: '1080',
+        filenameStyle: 'basic'
       })
-    } else {
-      console.log('[download] Selecting video format...')
-      // Get best video+audio format (mp4 preferred)
-      selectedFormat = ytdl.chooseFormat(info.formats, {
-        quality: 'highest',
-        filter: (f) => f.container === 'mp4' && f.hasVideo && f.hasAudio
-      })
-      
-      // Fallback to any format with video+audio
-      if (!selectedFormat) {
-        console.log('[download] No MP4 found, trying fallback...')
-        selectedFormat = ytdl.chooseFormat(info.formats, {
-          quality: 'highest',
-          filter: 'videoandaudio'
-        })
-      }
-    }
+    })
     
-    if (!selectedFormat || !selectedFormat.url) {
-      console.log('[download] Error: No suitable format found')
+    if (!cobaltResponse.ok) {
+      const errorText = await cobaltResponse.text()
+      console.error('[download] Cobalt API error:', errorText)
       return NextResponse.json(
-        { error: 'No suitable format found for this video' },
-        { status: 404 }
+        { error: 'Download service temporarily unavailable' },
+        { status: 503 }
       )
     }
     
-    console.log('[download] Selected format:', selectedFormat.qualityLabel || selectedFormat.audioBitrate, 'Container:', selectedFormat.container)
+    const cobaltData = await cobaltResponse.json()
     
-    // Determine content type and extension
-    let contentType: string
-    let extension: string
-    
-    switch (format) {
-      case 'mp3':
-        contentType = 'audio/mpeg'
-        extension = 'mp3'
-        break
-      case 'm4a':
-        contentType = 'audio/mp4'
-        extension = 'm4a'
-        break
-      case 'webm':
-        contentType = 'video/webm'
-        extension = 'webm'
-        break
-      case 'mp4':
-      default:
-        contentType = selectedFormat.mimeType?.split(';')[0] || 'video/mp4'
-        extension = 'mp4'
+    if (cobaltData.status === 'error') {
+      return NextResponse.json(
+        { error: cobaltData.error?.code || 'Failed to process video' },
+        { status: 400 }
+      )
     }
     
-    const filename = `${title}.${extension}`
-    console.log('[download] Streaming file:', filename)
+    // Get the download URL from Cobalt response
+    let downloadUrl = cobaltData.url
     
-    // Fetch the video/audio stream from YouTube
-    const response = await fetch(selectedFormat.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Range': 'bytes=0-'
+    // Handle picker (multiple formats available)
+    if (cobaltData.status === 'picker' && cobaltData.picker) {
+      // Find the best option
+      const picker = cobaltData.picker
+      if (isAudio) {
+        downloadUrl = picker.find((p: { type: string }) => p.type === 'audio')?.url || picker[0]?.url
+      } else {
+        downloadUrl = picker.find((p: { type: string }) => p.type === 'video')?.url || picker[0]?.url
       }
-    })
+    }
     
-    if (!response.ok || !response.body) {
-      console.log('[download] Error: Failed to fetch stream, status:', response.status)
+    if (!downloadUrl) {
       return NextResponse.json(
-        { error: 'Failed to fetch video stream' },
+        { error: 'Could not get download URL' },
         { status: 500 }
       )
     }
     
-    console.log('[download] Stream started successfully')
-    
-    // Return the stream response
-    return new NextResponse(response.body, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': selectedFormat.contentLength || response.headers.get('Content-Length') || '',
-        'Cache-Control': 'no-cache',
-        'Accept-Ranges': 'bytes'
-      }
-    })
+    // Redirect to the download URL
+    return NextResponse.redirect(downloadUrl)
     
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorStack = error instanceof Error ? error.stack : ''
-    
     console.error('[download] Error:', errorMessage)
-    console.error('[download] Stack:', errorStack)
-    
-    // Return more specific error messages
-    if (errorMessage.includes('Sign in to confirm your age')) {
-      return NextResponse.json(
-        { error: 'This video is age-restricted and cannot be downloaded.' },
-        { status: 403 }
-      )
-    }
-    
-    if (errorMessage.includes('private video')) {
-      return NextResponse.json(
-        { error: 'This video is private and cannot be accessed.' },
-        { status: 403 }
-      )
-    }
     
     return NextResponse.json(
       { error: `Failed to download video: ${errorMessage}` },
