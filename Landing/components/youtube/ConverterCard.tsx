@@ -98,7 +98,7 @@ export default function ConverterCard() {
     return () => clearTimeout(timer)
   }, [url, isValidUrl, fetchVideoInfo])
 
-  // Handle convert - call Python yt-dlp backend
+  // Handle convert - call Railway Python backend
   const handleConvert = async () => {
     if (!videoInfo || !url) return
 
@@ -109,27 +109,24 @@ export default function ConverterCard() {
     const videoId = videoInfo.id
     const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
-    // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Calling Python yt-dlp API',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
-    // #endregion
+    // Railway backend URL (set in Vercel environment variables)
+    const backendUrl = process.env.NEXT_PUBLIC_YOUTUBE_API_URL
+    
+    if (!backendUrl) {
+      setError('Backend not configured. Please set NEXT_PUBLIC_YOUTUBE_API_URL.')
+      setStatus('error')
+      return
+    }
 
     try {
-      // Call our Python yt-dlp API
-      const apiUrl = `/api/ytdl?url=${encodeURIComponent(fullYouTubeUrl)}&format=${format}`
+      // Call Railway Python backend
+      const apiUrl = `${backendUrl}/api/download?url=${encodeURIComponent(fullYouTubeUrl)}&format=${format}`
       const response = await fetch(apiUrl)
 
-      // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API response',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
-      // #endregion
-
       const data = await response.json()
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API data',data:{success:data.success,hasDownloadUrl:!!data.download_url,error:data.error},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
-      // #endregion
 
-      if (!data.success) {
-        throw new Error(data.error || 'Download failed')
+      if (!response.ok) {
+        throw new Error(data.detail || 'Download failed')
       }
 
       if (data.download_url) {
@@ -142,10 +139,6 @@ export default function ConverterCard() {
         throw new Error('No download URL available')
       }
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Python API error',data:{error:err instanceof Error ? err.message : 'Unknown error'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-python-ytdlp'})}).catch(()=>{});
-      // #endregion
-      
       setError(err instanceof Error ? err.message : 'Download failed')
       setStatus('error')
     }

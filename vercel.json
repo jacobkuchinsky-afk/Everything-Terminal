@@ -1,16 +1,5 @@
 {
   "installCommand": "npm install && cd Landing && npm install",
   "buildCommand": "cd Landing && npm run build",
-  "outputDirectory": "Landing/.next",
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.9"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/ytdl",
-      "destination": "/api/ytdl"
-    }
-  ]
+  "outputDirectory": "Landing/.next"
 }
