@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle, ExternalLink } from 'lucide-react'
+import { Loader2, AlertCircle, Download } from 'lucide-react'
 import LinkInput from '@/components/youtube/LinkInput'
 import FormatSelector from '@/components/youtube/FormatSelector'
-import ConvertButton from '@/components/youtube/ConvertButton'
 import VideoPreview, { VideoInfo } from '@/components/youtube/VideoPreview'
 
 type Status = 'idle' | 'fetching' | 'ready' | 'downloading' | 'error'
@@ -29,6 +28,7 @@ export default function ConverterCard() {
   const [status, setStatus] = useState<Status>('idle')
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
 
   // Check if URL looks like a valid YouTube URL
   const isValidUrl = url.includes('youtube.com') || url.includes('youtu.be')
@@ -39,11 +39,13 @@ export default function ConverterCard() {
       setVideoInfo(null)
       setStatus('idle')
       setError(null)
+      setDownloadUrl(null)
       return
     }
 
     setStatus('fetching')
     setError(null)
+    setDownloadUrl(null)
 
     try {
       const videoId = extractVideoId(videoUrl)
@@ -89,49 +91,92 @@ export default function ConverterCard() {
         setVideoInfo(null)
         setStatus('idle')
         setError(null)
+        setDownloadUrl(null)
       }
     }, 500)
 
     return () => clearTimeout(timer)
   }, [url, isValidUrl, fetchVideoInfo])
 
-  // Handle download - redirect to external download service
+  // Handle convert - call Cobalt API directly from browser
   const handleConvert = async () => {
     if (!videoInfo || !url) return
 
     setStatus('downloading')
     setError(null)
+    setDownloadUrl(null)
 
     const videoId = videoInfo.id
     const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
     // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Starting download redirect',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-working-services'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Calling Cobalt API from browser',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
     // #endregion
-    
-    // Build download URL - using 10downloader.com which is currently operational
-    // Format: https://10downloader.com/download?v=VIDEO_URL
-    let downloadUrl: string
-    
-    if (format === 'mp3') {
-      // For MP3: use y2mate.is (different from y2mate.com)
-      downloadUrl = `https://www.y2mate.is/v72/youtube-mp3/${videoId}`
-    } else {
-      // For MP4: use 10downloader.com 
-      downloadUrl = `https://10downloader.com/download?v=${encodeURIComponent(fullYouTubeUrl)}`
+
+    try {
+      // Call Cobalt API directly from browser (user's IP)
+      const cobaltResponse = await fetch('https://api.cobalt.tools/', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: fullYouTubeUrl,
+          downloadMode: format === 'mp3' ? 'audio' : 'auto',
+          audioFormat: 'mp3',
+          videoQuality: '720',
+        })
+      })
+
+      // #region agent log
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt response received',data:{status:cobaltResponse.status,ok:cobaltResponse.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      // #endregion
+
+      const data = await cobaltResponse.json()
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt data parsed',data:{status:data.status,hasUrl:!!data.url,error:data.error},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      // #endregion
+
+      if (data.status === 'error') {
+        throw new Error(data.error?.code || 'Download failed')
+      }
+
+      if (data.status === 'tunnel' || data.status === 'redirect') {
+        // Direct download URL
+        setDownloadUrl(data.url)
+        setStatus('ready')
+        
+        // Auto-trigger download
+        const link = document.createElement('a')
+        link.href = data.url
+        link.download = `${videoInfo.title}.${format}`
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else if (data.status === 'picker') {
+        // Multiple options - use first one
+        if (data.picker && data.picker.length > 0) {
+          const firstOption = data.picker[0]
+          setDownloadUrl(firstOption.url)
+          setStatus('ready')
+          window.open(firstOption.url, '_blank')
+        } else {
+          throw new Error('No download options available')
+        }
+      } else {
+        throw new Error('Unexpected response from server')
+      }
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Cobalt error',data:{error:err instanceof Error ? err.message : 'Unknown error'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-client-cobalt'})}).catch(()=>{});
+      // #endregion
+      
+      setError(err instanceof Error ? err.message : 'Download failed')
+      setStatus('error')
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Opening download URL',data:{downloadUrl,format},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-working-services'})}).catch(()=>{});
-    // #endregion
-    
-    // Open in new tab
-    window.open(downloadUrl, '_blank')
-    
-    // Reset status after a moment
-    setTimeout(() => {
-      setStatus('ready')
-    }, 1000)
   }
 
   // Handle URL change
@@ -141,6 +186,7 @@ export default function ConverterCard() {
       setVideoInfo(null)
       setStatus('idle')
       setError(null)
+      setDownloadUrl(null)
     }
   }
 
@@ -185,18 +231,37 @@ export default function ConverterCard() {
       {/* Format selector and convert button */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
         <FormatSelector value={format} onChange={setFormat} />
-        <ConvertButton 
-          disabled={status !== 'ready' || !videoInfo} 
+        <button
           onClick={handleConvert}
-          loading={status === 'downloading'}
-        />
+          disabled={status !== 'ready' || !videoInfo || status === 'downloading'}
+          className="px-8 py-3 bg-yt-red hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center gap-2"
+        >
+          {status === 'downloading' ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Converting...
+            </>
+          ) : (
+            <>
+              <Download className="w-5 h-5" />
+              Convert
+            </>
+          )}
+        </button>
       </div>
 
-      {/* Download note */}
-      {videoInfo && (
-        <div className="flex items-center justify-center gap-2 text-yt-text-muted text-sm mt-4">
-          <ExternalLink className="w-4 h-4" />
-          <span>Opens download page in new tab</span>
+      {/* Download link if available */}
+      {downloadUrl && (
+        <div className="mt-4 p-4 bg-green-500/10 rounded-lg text-center">
+          <p className="text-green-400 mb-2">Download ready!</p>
+          <a 
+            href={downloadUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-yt-red hover:underline"
+          >
+            Click here if download didn&apos;t start automatically
+          </a>
         </div>
       )}
 
