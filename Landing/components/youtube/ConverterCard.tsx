@@ -103,10 +103,28 @@ export default function ConverterCard() {
     setError(null)
 
     const videoId = videoInfo.id
+    const fullYouTubeUrl = `https://www.youtube.com/watch?v=${videoId}`
     
-    // Use y2mate which is still operational
-    // It will open in a new tab where user can download
-    const downloadUrl = `https://www.y2mate.com/youtube/${videoId}`
+    // #region agent log
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Starting download redirect',data:{videoId,format,fullYouTubeUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-url-format'})}).catch(()=>{});
+    // #endregion
+    
+    // Build download URL based on format
+    // Using ssyoutube.com (prepend 'ss' to youtube.com URL path)
+    // This service works by transforming youtube.com URLs
+    let downloadUrl: string
+    
+    if (format === 'mp3') {
+      // For MP3: use yt1s which has good audio conversion
+      downloadUrl = `https://www.yt1s.com/en/youtube-to-mp3?q=${encodeURIComponent(fullYouTubeUrl)}`
+    } else {
+      // For MP4: use ssyoutube (prepend 'ss' to youtube.com)
+      downloadUrl = `https://www.ssyoutube.com/watch?v=${videoId}`
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7247/ingest/49f0dc33-bebf-44a3-b728-c2694e495afc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConverterCard.tsx:handleConvert',message:'Opening download URL',data:{downloadUrl,format},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-url-format'})}).catch(()=>{});
+    // #endregion
     
     // Open in new tab
     window.open(downloadUrl, '_blank')
